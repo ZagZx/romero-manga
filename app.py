@@ -1,7 +1,8 @@
-from flask import Flask, render_template, Response, request, url_for, redirect
-from flask_login import login_user, logout_user, login_required, current_user, LoginManager
+from quart import Quart, render_template, request, url_for, redirect
+from quart_auth import login_user, logout_user, login_required, current_user, QuartAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
+from httpx import Request, Response
 
 import os
 import time
@@ -24,26 +25,27 @@ if not os.path.exists(DB_PATH) or DROPAR_TABELAS:
 
 load_dotenv('./.env')
 
-app = Flask(__name__)
+app = Quart(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+login_manager = QuartAuth()
+login_manager.init_app(app)
+# login_manager.login_view = 'login'
 
-@login_manager.user_loader
-def load_user(user_id):
-    user_data = db.run_query('SELECT id, username, email FROM users WHERE id = ?', user_id)
-    if user_data:
-        user_data = user_data[0]
-        return User(id=user_data[0], username=user_data[1], email=user_data[2])
-    return None
+# @login_manager.user_loader
+# def load_user(user_id):
+#     user_data = db.run_query('SELECT id, username, email FROM users WHERE id = ?', user_id)
+#     if user_data:
+#         user_data = user_data[0]
+#         return User(id=user_data[0], username=user_data[1], email=user_data[2])
+#     return None
 
 @app.route('/')
-def index():
-    return render_template('index.html')
+async def index():
+    return await render_template('index.html')
 
 @app.route('/search')
-def search():
+async def search():
     title = request.args.get('query')
     results = search_manga_by_title(title)
 
@@ -53,30 +55,32 @@ def search():
         manga.manga_data = manga_data
         mangas_list.append(manga)
         # print(manga.title)
-    return render_template('search.html', mangas_list = mangas_list)
+    return await render_template('search.html', mangas_list = mangas_list)
 
 @app.route('/cadastro', methods=['GET', 'POST'])
-def register():
+async def register():
     if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password_hash = generate_password_hash(request.form.get('password'))
+        form = await request.form
+        username = form.get('username')
+        email = form.get('email')
+        password_hash = generate_password_hash(form.get('password'))
 
         if not db.run_query(f"SELECT * FROM users WHERE email = ?", email):
             db.run_query(f"INSERT INTO users(username, email, password_hash) VALUES (?, ?, ?)", (username, email, password_hash))
-            return redirect(url_for('login'))
+            return await redirect(url_for('login'))
         else: 
             print('Já existe um usuário cadastrado com esse email')
-            return render_template('register.html') # colocar mensagem de erro
+            return await render_template('register.html') # colocar mensagem de erro
     if request.method == 'GET':
-        return render_template('register.html')
+        return await render_template('register.html')
 
 @app.route('/login', methods = ['GET', 'POST'])
-def login():
+async def login():
     # fazer tratamento de erros caso a senha esteja errada
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+        form = await request.method
+        email = form.get('email')
+        password = form.get('password')
 
         user_data = db.run_query('SELECT id, username, password_hash FROM users WHERE email = ?', (email,))
         if user_data:
@@ -84,24 +88,24 @@ def login():
             if check_password_hash(user_data[2], password):
                 user = User(id=user_data[0], username=user_data[1], email=email)
                 login_user(user)
-                return redirect(url_for('index'))
+                return await redirect(url_for('index'))
             else:
                 print('Senha errada')
         # else:
         #     print('Email não cadastrado')
-        return render_template('login.html') # colocar mensagem de erro
+        return await render_template('login.html') # colocar mensagem de erro
     elif request.method == 'GET':
-        return render_template('login.html')
+        return await render_template('login.html')
 
 @app.route('/logout')
 @login_required
-def logout():
+async def logout():
     logout_user()
 
-    return redirect(url_for('index'))
+    return await redirect(url_for('index'))
 
 @app.route('/cover-proxy/<manga_id>/<filename>')
-def cover_proxy(manga_id:str, filename:str):
+async def cover_proxy(manga_id:str, filename:str):
     before = time.time()
     
     manga = Manga(manga_id)
@@ -114,4 +118,4 @@ def cover_proxy(manga_id:str, filename:str):
         print(f'Mangá: {manga.title}')
         print(f'Tempo de Execução: {round(now-before,2)}s\n')
 
-        return Response(cover_image.content, content_type=cover_image.headers['Content-Type'])
+        return await Response(cover_image.content, content_type=cover_image.headers['Content-Type'])
