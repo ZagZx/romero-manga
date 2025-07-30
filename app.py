@@ -1,8 +1,7 @@
-from quart import Quart, render_template, request, url_for, redirect
+from quart import Quart, render_template, request, Response, url_for, redirect
 from quart_auth import login_user, logout_user, login_required, current_user, QuartAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
-from httpx import Request, Response
 
 import os
 import time
@@ -30,6 +29,10 @@ app.secret_key = os.getenv('SECRET_KEY')
 
 login_manager = QuartAuth()
 login_manager.init_app(app)
+
+
+# FLASK LOGIN
+
 # login_manager.login_view = 'login'
 
 # @login_manager.user_loader
@@ -67,7 +70,7 @@ async def register():
 
         if not db.run_query(f"SELECT * FROM users WHERE email = ?", email):
             db.run_query(f"INSERT INTO users(username, email, password_hash) VALUES (?, ?, ?)", (username, email, password_hash))
-            return await redirect(url_for('login'))
+            return redirect(url_for('login'))
         else: 
             print('Já existe um usuário cadastrado com esse email')
             return await render_template('register.html') # colocar mensagem de erro
@@ -78,7 +81,7 @@ async def register():
 async def login():
     # fazer tratamento de erros caso a senha esteja errada
     if request.method == 'POST':
-        form = await request.method
+        form = await request.form
         email = form.get('email')
         password = form.get('password')
 
@@ -86,9 +89,9 @@ async def login():
         if user_data:
             user_data = user_data[0]
             if check_password_hash(user_data[2], password):
-                user = User(id=user_data[0], username=user_data[1], email=email)
+                user = User(auth_id=user_data[0], username=user_data[1], email=email)
                 login_user(user)
-                return await redirect(url_for('index'))
+                return redirect(url_for('index'))
             else:
                 print('Senha errada')
         # else:
@@ -102,7 +105,7 @@ async def login():
 async def logout():
     logout_user()
 
-    return await redirect(url_for('index'))
+    return redirect(url_for('index'))
 
 @app.route('/cover-proxy/<manga_id>/<filename>')
 async def cover_proxy(manga_id:str, filename:str):
@@ -118,4 +121,4 @@ async def cover_proxy(manga_id:str, filename:str):
         print(f'Mangá: {manga.title}')
         print(f'Tempo de Execução: {round(now-before,2)}s\n')
 
-        return await Response(cover_image.content, content_type=cover_image.headers['Content-Type'])
+        return Response(cover_image.content, content_type=cover_image.headers['Content-Type'])
