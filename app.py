@@ -2,6 +2,7 @@ from quart import Quart, render_template, request, Response, url_for, redirect
 from quart_auth import login_user, logout_user, login_required, current_user, QuartAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
+import asyncio
 
 import os
 import time
@@ -49,14 +50,29 @@ async def index():
 
 @app.route('/search')
 async def search():
+    # precisa de: titulo, id, cover_filename
     title = request.args.get('query')
-    results = search_manga_by_title(title)
+    results = await search_manga_by_title(title)
 
     mangas_list = []
     for manga_data in results:
         manga = Manga(manga_data['id'])
-        manga.manga_data = manga_data
-        mangas_list.append(manga)
+        manga.set_manga_data(manga_data)
+
+        # inicia as duas tarefas ao mesmo tempo e retorna as duas juntas
+        title, cover_filename = await asyncio.gather( 
+            manga.get_title(),
+            manga.get_cover_filename()
+        )
+
+        mangas_list.append(
+            {
+                "id": manga.id,
+                "title": title,
+                "cover_image": url_for('cover_proxy', manga_id = manga.id, filename = cover_filename)
+            }
+        )
+        
         # print(manga.title)
     return await render_template('search.html', mangas_list = mangas_list)
 
@@ -114,11 +130,12 @@ async def cover_proxy(manga_id:str, filename:str):
     manga = Manga(manga_id)
 
     if filename and manga_id:
-        cover_image = manga.cover_image
+        cover_image = await manga.get_cover_image()
+        print(cover_image)
 
         now = time.time()
         print('\n====COVER PROXY====')
-        print(f'Mangá: {manga.title}')
+        print(f'Mangá: {await manga.get_title()}')
         print(f'Tempo de Execução: {round(now-before,2)}s\n')
 
         return Response(cover_image.content, content_type=cover_image.headers['Content-Type'])

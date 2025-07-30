@@ -8,8 +8,8 @@
 <div class="container">
     {% for manga in mangas_list %}
     <div class="card">
-        <img width="112" height="160" src="{{ url_for('cover_proxy', manga_id = manga.id, filename = manga.cover_filename) }}" alt="">
-        <span>{{ manga.title }}</span>
+        <img width="112" height="160" src="{{ manga['cover_image'] }}" alt="">
+        <span>{{ manga['title'] }}</span>
     </div>
     {% endfor %}
 </div>
