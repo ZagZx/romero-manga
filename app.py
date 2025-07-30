@@ -60,16 +60,13 @@ async def search():
         manga.set_manga_data(manga_data)
 
         # inicia as duas tarefas ao mesmo tempo e retorna as duas juntas
-        title, cover_filename = await asyncio.gather( 
-            manga.get_title(),
-            manga.get_cover_filename()
-        )
+        title = await manga.get_title()
 
         mangas_list.append(
             {
                 "id": manga.id,
                 "title": title,
-                "cover_image": url_for('cover_proxy', manga_id = manga.id, filename = cover_filename)
+                "cover_image": url_for('cover_proxy_by_manga_id', manga_id = manga.id)
             }
         )
         
@@ -125,6 +122,11 @@ async def logout():
 
 @app.route('/cover-proxy/<manga_id>/<filename>')
 async def cover_proxy(manga_id:str, filename:str):
+    '''
+    A API do MangaDex bloqueia requisições de imagens feitas direto do HTML para evitar o consumo excessivo do servidor deles,
+    então para colocar as imagens no HTML é preciso hospedar elas no meu servidor primeiro e então fazer a requisição da imagem pelo url do proxy.
+    '''
+
     before = time.time()
     
     manga = Manga(manga_id)
@@ -139,3 +141,16 @@ async def cover_proxy(manga_id:str, filename:str):
         print(f'Tempo de Execução: {round(now-before,2)}s\n')
 
         return Response(cover_image.content, content_type=cover_image.headers['Content-Type'])
+    
+@app.route('/cover_proxy/<manga_id>')
+async def cover_proxy_by_manga_id(manga_id):
+    '''
+    Gambiarra para acelerar a pesquisa, ao invés de passar os filenames e travar a página por muito tempo,
+    é passado no dicionário um url_for para esta rota e nela é obtido o filename e então ela redireciona para a cover_proxy.
+
+    Ou seja, aumenta o tempo de carregamento das imagens para diminuir consideravelmente o tempo de tela travada.
+    '''
+    
+    manga = Manga(manga_id)
+    cover_filename = await manga.get_cover_filename()
+    return redirect(url_for('cover_proxy', manga_id = manga_id, filename = cover_filename))
