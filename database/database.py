@@ -35,11 +35,15 @@ class Database:
 
 
     # AJUSTAR RUN QUERY PRA SER UTILIZADO DENTRO DA CLASSE EM FUNÇÕES COMO add_user
-    def run_query(self, sql_query:str, params:Union[tuple,list] = None) -> list: # fazer doc depois
+    def run_query(self, sql_query:str, params:Union[tuple,list, Any] = None) -> list: # fazer doc depois
         result = None
         try:
             if params:
-                cursor = self.connection.execute(sql_query, params)
+                if isinstance(params, (tuple, list)):
+                    cursor = self.connection.execute(sql_query, params)
+                else:
+                    cursor = self.connection.execute(sql_query, (params,))
+
             else:
                 cursor = self.connection.execute(sql_query)
 
@@ -47,7 +51,7 @@ class Database:
             result = cursor.fetchall()
             self.connection.close()
         except Exception as e: # tirar quando entrar em produção
-            print(f'Erro ao rodar query: {e}')
+            print(f'Erro ao rodar query: {e}\nQuery: {sql_query}')
         
         return result
 

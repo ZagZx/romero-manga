@@ -28,6 +28,10 @@ load_dotenv('./.env')
 app = Quart(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
+# tirar isso se for hospedar em https
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['DEBUG'] = True
+
 login_manager = QuartAuth()
 login_manager.init_app(app)
 
@@ -98,7 +102,7 @@ async def login():
         email = form.get('email')
         password = form.get('password')
 
-        user_data = db.run_query('SELECT id, username, password_hash FROM users WHERE email = ?', (email,))
+        user_data = db.run_query('SELECT id, username, password_hash FROM users WHERE email = ?', email)
         if user_data:
             user_data = user_data[0]
             if check_password_hash(user_data[2], password):
@@ -150,7 +154,7 @@ async def cover_proxy_by_manga_id(manga_id):
 
     Ou seja, aumenta o tempo de carregamento das imagens para diminuir consideravelmente o tempo de tela travada.
     '''
-    
+
     manga = Manga(manga_id)
     cover_filename = await manga.get_cover_filename()
     return redirect(url_for('cover_proxy', manga_id = manga_id, filename = cover_filename))
