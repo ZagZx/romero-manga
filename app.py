@@ -74,7 +74,6 @@ async def search():
             }
         )
         
-        # print(manga.title)
     return await render_template('search.html', mangas_list = mangas_list)
 
 @app.route('/cadastro', methods=['GET', 'POST'])
@@ -137,7 +136,6 @@ async def cover_proxy(manga_id:str, filename:str):
 
     if filename and manga_id:
         cover_image = await manga.get_cover_image()
-        print(cover_image)
 
         now = time.time()
         print('\n====COVER PROXY====')
